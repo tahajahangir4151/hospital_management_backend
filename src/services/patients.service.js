@@ -1,62 +1,62 @@
 import supabase from "../config/supabase.js";
 
-//Get All Departments
-export const getDepartments = async () => {
+//Get all patients
+export const getPatients = async () => {
   const { data, error } = await supabase
-    .from("departments")
+    .from("patients")
     .select("*")
     .order("created_at", { ascending: false });
 
   if (error) throw error;
-
   return data;
 };
 
-//Get Single Department via id
-export const getDepartmentById = async (id) => {
+// Get patient by ID
+export const getPatientById = async (id) => {
   const { data, error } = await supabase
-    .from("departments")
+    .from("patients")
     .select("*")
     .eq("id", id)
     .single();
-
-  if (error) throw error;
-  return data;
-};
-
-//Create Deparmtent
-export const createDepartment = async (department) => {
-  const { data, error } = await supabase
-    .from("departments")
-    .insert([department])
-    .select()
-    .single();
-
   if (error) throw error;
 
   return data;
 };
 
-//Updae department
-export const updateDepartment = async (id, department) => {
+//Create Patients
+export const createPatient = async (patient) => {
   const { data, error } = await supabase
-    .from("departments")
-    .update(department)
-    .eq("id", id)
+    .from("patients")
+    .insert([patient])
     .select()
     .single();
+
   if (error) return error;
   return data;
 };
 
-//Delete any department
-export const deleteDepartment = async (id) => {
+// Update patient
+export const updatePatientById = async (id, patient) => {
   const { data, error } = await supabase
-    .from("departments")
+    .from("patients")
+    .update(patient)
+    .eq("id", id)
+    .select()
+    .single();
+  if (error) throw error;
+
+  return data;
+};
+
+// Delete patient
+export const deletePatientById = async (id) => {
+  const { data, error } = await supabase
+    .from("patients")
     .delete()
     .eq("id", id)
     .select()
     .single();
-  if (error) return error;
+  if (error) throw error;
+
   return data;
 };

@@ -6,6 +6,7 @@ import {
   removeDoctor,
   updateDoctor,
 } from "../controllers/doctor.controller.js";
+import { getDoctorTreatments } from "../controllers/treatment.controller.js";
 
 const router = express.Router();
 
@@ -217,5 +218,40 @@ router.put("/:id", updateDoctor);
  *         description: Doctor not found
  */
 router.delete("/:id", removeDoctor);
+
+/**
+ * @swagger
+ * /api/doctors/{id}/treatments:
+ *   get:
+ *     summary: Get all treatments performed by a doctor
+ *     tags:
+ *       - Doctors
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: Doctor ID
+ *     responses:
+ *       200:
+ *         description: Doctor treatments fetched successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/Treatment'
+ *       500:
+ *         description: Failed to fetch doctor treatments
+ */
+router.get("/:id/treatments", getDoctorTreatments);
 
 export default router;

@@ -1,8 +1,7 @@
 import express from "express";
 import cors from "cors";
-import swaggerUi from "swagger-ui-express";
 
-import swaggerSpec from "./config/swagger.js";
+import swaggerSpec, { swaggerUiHtml } from "./config/swagger.js";
 import healthRoutes from "./routes/health.route.js";
 import departmentRoutes from "./routes/department.route.js";
 import doctorRoutes from "./routes/doctor.route.js";
@@ -24,6 +23,15 @@ app.use("/api/treatments", treatmentRoutes);
 app.use("/api/rooms", roomRoutes);
 app.use("/api/admissions", admissionRoutes);
 
-app.use("/api/docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+// Swagger Documentation
+app.get("/api/docs.json", (req, res) => {
+  res.setHeader("Content-Type", "application/json");
+  res.send(swaggerSpec);
+});
+
+app.use("/api/docs", (req, res) => {
+  res.setHeader("Content-Type", "text/html");
+  res.send(swaggerUiHtml);
+});
 
 export default app;

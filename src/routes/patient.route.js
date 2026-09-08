@@ -8,6 +8,7 @@ import {
   updatePatient,
 } from "../controllers/patient.controller.js";
 import { getPatientTreatments } from "../controllers/treatment.controller.js";
+import { getPatientAdmissions } from "../controllers/admission.controller.js";
 
 const router = express.Router();
 
@@ -245,5 +246,40 @@ router.delete("/:id", removePatient);
  *         description: Failed to fetch patient treatments
  */
 router.get("/:id/treatments", getPatientTreatments);
+
+/**
+ * @swagger
+ * /api/patients/{id}/admissions:
+ *   get:
+ *     summary: Get patient admission history
+ *     tags:
+ *       - Patients
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: Patient ID
+ *     responses:
+ *       200:
+ *         description: Patient admission history fetched successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/Admission'
+ *       500:
+ *         description: Failed to fetch patient admission history
+ */
+router.get("/:id/admissions", getPatientAdmissions);
 
 export default router;

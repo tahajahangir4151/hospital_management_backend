@@ -7,6 +7,7 @@ import {
   removeRoom,
   updateRoom,
 } from "../controllers/room.controller.js";
+import { getRoomAdmissions, getRoomCurrentOccupants } from "../controllers/admission.controller.js";
 
 const router = express.Router();
 
@@ -204,5 +205,75 @@ router.put("/:id", updateRoom);
  *         description: Failed to delete room
  */
 router.delete("/:id", removeRoom);
+
+/**
+ * @swagger
+ * /api/rooms/{id}/admissions:
+ *   get:
+ *     summary: Get room admission history
+ *     tags:
+ *       - Rooms
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: Room ID
+ *     responses:
+ *       200:
+ *         description: Room admission history fetched successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/Admission'
+ *       500:
+ *         description: Failed to fetch room admission history
+ */
+router.get("/:id/admissions", getRoomAdmissions);
+
+/**
+ * @swagger
+ * /api/rooms/{id}/occupants:
+ *   get:
+ *     summary: Get current occupants of a room
+ *     tags:
+ *       - Rooms
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: Room ID
+ *     responses:
+ *       200:
+ *         description: Current room occupants fetched successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/Admission'
+ *       500:
+ *         description: Failed to fetch current room occupants
+ */
+router.get("/:id/occupants", getRoomCurrentOccupants);
 
 export default router;

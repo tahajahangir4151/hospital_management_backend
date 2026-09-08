@@ -107,3 +107,79 @@ export const admitPatient = async ({ patient_id, room_id, admission_date }) => {
 
   return admission;
 };
+
+//Discharge Patient
+export const dischargePatient = async (admissionId) => {
+  const { data: admission, error: admissionError } = await supabase
+    .from("room_assignments")
+    .select("*")
+    .eq("id", admissionId)
+    .is("discharge_date", null)
+    .maybeSingle();
+
+  if (admissionError) {
+    throw admissionError;
+  }
+
+  if (!admission) {
+    const error = new Error("Active admission not found");
+
+    error.statusCode = 404;
+    throw error;
+  }
+
+  const { data: dischargedAdmission, error: dischargeError } = await supabase
+    .from("room_assignments")
+    .update({
+      discharge_date: new Date().toISOString(),
+    })
+    .eq("id", admissionId)
+    .select("*")
+    .single();
+
+  if (dischargeError) {
+    throw dischargeError;
+  }
+
+  return dischargedAdmission;
+};
+
+//Get admission history
+export const getAdmissionsByPatientId = async (patientId) => {
+  const { data, error } = await supabase
+    .from("room_assignments")
+    .select("*")
+    .eq("patient_id", patientId)
+    .order("admission_date", { ascending: false });
+
+  if (error) throw error;
+
+  return data;
+};
+
+//Get admission history by room id
+export const getAdmissionsByRoomId = async (roomId) => {
+  const { data, error } = await supabase
+    .from("room_assignments")
+    .select("*")
+    .eq("room_id", roomId)
+    .order("admission_date", { ascending: false });
+
+  if (error) throw error;
+
+  return data;
+};
+
+//Get current room ouccupant
+export const getRoomOccupants = async (roomId) => {
+  const { data, error } = await supabase
+    .from("room_assignments")
+    .select("*")
+    .eq("room_id", roomId)
+    .is("discharge_date", null)
+    .order("admission_date", { ascending: false });
+
+  if (error) throw error;
+
+  return data;
+};

@@ -2,6 +2,7 @@ import express from "express";
 
 import {
   addAdmission,
+  dischargeAdmission,
   getAllAdmissions,
 } from "../controllers/admission.controller.js";
 import { createRequire } from "module";
@@ -127,5 +128,43 @@ router.get("/", getAllAdmissions);
  *         description: Failed to admit patient
  */
 router.post("/", addAdmission);
+
+/**
+ * @swagger
+ * /api/admissions/{id}/discharge:
+ *   patch:
+ *     summary: Discharge a patient from an active admission
+ *     tags:
+ *       - Admissions
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: Admission ID
+ *     responses:
+ *       200:
+ *         description: Patient discharged successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: Patient discharged successfully
+ *                 data:
+ *                   $ref: '#/components/schemas/Admission'
+ *       404:
+ *         description: Active admission not found
+ *       500:
+ *         description: Failed to discharge patient
+ */
+router.patch("/:id/discharge", dischargeAdmission);
 
 export default router;

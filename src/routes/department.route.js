@@ -8,8 +8,10 @@ import {
   updateDepartmentById,
 } from "../controllers/department.controller.js";
 import { getDepartmentDoctors } from "../controllers/doctor.controller.js";
+import { authenticateAdmin } from "../middlewares/auth.middleware.js";
 
 const router = express.Router();
+router.use(authenticateAdmin);
 
 /**
  * @swagger
@@ -50,6 +52,8 @@ const router = express.Router();
  *     summary: Get all departments
  *     tags:
  *       - Departments
+ *     security:
+ *       - bearerAuth: []
  *     responses:
  *       200:
  *         description: Departments fetched successfully
@@ -65,6 +69,10 @@ const router = express.Router();
  *                   type: array
  *                   items:
  *                     $ref: '#/components/schemas/Department'
+ *       401:
+ *         description: Authentication required
+ *       403:
+ *         description: Admin access required
  *       500:
  *         description: Failed to fetch departments
  */

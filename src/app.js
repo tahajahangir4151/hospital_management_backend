@@ -1,3 +1,5 @@
+import "dotenv/config";
+
 import express from "express";
 import cors from "cors";
 
@@ -15,7 +17,7 @@ import authRoutes from "./routes/auth.route.js";
 
 const app = express();
 
-const allowedOrigins = [process.env.FRONTEND_URL];
+const allowedOrigins = [process.env.FRONTEND_URL, process.env.BACKEND_URL];
 
 app.use(
   cors({

@@ -110,3 +110,40 @@ export const getRoomsByNurseId = async (nurseId) => {
 
   return assignments.map((assignment) => assignment.rooms);
 };
+
+//Remove nurse from room
+export const removeNurseRoomAssigment = async (nurseId, roomId) => {
+  if (!nurseId || !roomId) {
+    const error = new Error("Nurse ID and Room ID are required");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  // check if assignment exist
+  const { data: assignment, error: assignmentError } = await supabase
+    .from("nurse_room_assignments")
+    .select("id")
+    .eq("nurse_id", nurseId)
+    .eq("room_id", roomId)
+    .maybeSingle();
+
+  if (assignmentError) return assignmentError;
+
+  if (!assignment) {
+    const error = new Error("Nurse is not assigned to this room");
+    error.statusCode = 404;
+    throw error;
+  }
+  
+  // Remove relationship
+  const { error: deleteError } = await supabase
+    .from("nurse_room_assignments")
+    .delete()
+    .eq("id", assignment.id);
+
+  if (deleteError) {
+    throw deleteError;
+  }
+
+  return assignment;
+};

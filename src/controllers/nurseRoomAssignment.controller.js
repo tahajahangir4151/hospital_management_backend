@@ -1,4 +1,8 @@
-import { createNurseRoomAssignment, getRoomsByNurseId } from "../services/nurseRoomAssignments.service.js";
+import {
+  createNurseRoomAssignment,
+  getRoomsByNurseId,
+  removeNurseRoomAssigment,
+} from "../services/nurseRoomAssignments.service.js";
 
 export const addNurseRoomAssignment = async (req, res) => {
   try {
@@ -27,6 +31,24 @@ export const getNurseRooms = async (req, res) => {
     });
   } catch (error) {
     res.status(error.statusCode || 500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+export const removeNurseFromRoom = async (req, res) => {
+  try {
+    const { nurseId, roomId } = req.params;
+
+    await removeNurseRoomAssigment(nurseId, roomId);
+
+    return res.status(200).json({
+      success: true,
+      message: "Nurse removed from room successfully",
+    });
+  } catch (error) {
+    return res.status(error.statusCode || 500).json({
       success: false,
       message: error.message,
     });

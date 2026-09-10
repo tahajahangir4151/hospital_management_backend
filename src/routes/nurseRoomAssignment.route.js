@@ -1,6 +1,6 @@
 import express from "express";
 
-import { addNurseRoomAssignment } from "../controllers/nurseRoomAssignment.controller.js";
+import { addNurseRoomAssignment, removeNurseFromRoom } from "../controllers/nurseRoomAssignment.controller.js";
 
 const router = express.Router();
 
@@ -83,5 +83,50 @@ const router = express.Router();
  *         description: Failed to assign nurse to room
  */
 router.post("/", addNurseRoomAssignment);
+
+/**
+ * @swagger
+ * /api/nurse-room-assignments/nurse/{nurseId}/room/{roomId}:
+ *   delete:
+ *     summary: Remove a nurse from an assigned room
+ *     tags:
+ *       - Nurse Room Assignments
+ *     parameters:
+ *       - in: path
+ *         name: nurseId
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: Nurse ID
+ *       - in: path
+ *         name: roomId
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: Room ID
+ *     responses:
+ *       200:
+ *         description: Nurse removed from room successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: Nurse removed from room successfully
+ *       400:
+ *         description: Nurse ID and Room ID are required
+ *       404:
+ *         description: Nurse is not assigned to this room
+ *       500:
+ *         description: Failed to remove nurse from room
+ */
+router.delete("/nurse/:nurseId/room/:roomId", removeNurseFromRoom);
 
 export default router;

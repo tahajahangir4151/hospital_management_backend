@@ -14,6 +14,7 @@ import admissionRoutes from "./routes/admission.route.js";
 import nurseRoutes from "./routes/nurse.route.js";
 import nurseRoomAssignmentRoutes from "./routes/nurseRoomAssignment.route.js";
 import authRoutes from "./routes/auth.route.js";
+import billRoutes from "./routes/bill.route.js";
 
 const app = express();
 
@@ -47,6 +48,7 @@ app.use("/api/admissions", admissionRoutes);
 app.use("/api/nurses", nurseRoutes);
 app.use("/api/nurse-room-assignments", nurseRoomAssignmentRoutes);
 app.use("/api/auth", authRoutes);
+app.use("/api/bills", billRoutes);
 
 // Swagger Documentation
 app.get("/api/docs.json", (req, res) => {

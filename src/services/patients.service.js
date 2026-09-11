@@ -1,62 +1,93 @@
-import supabase from "../config/supabase.js";
+import pool from "../config/database.js";
 
-//Get all patients
+// Get all patients
 export const getPatients = async () => {
-  const { data, error } = await supabase
-    .from("patients")
-    .select("*")
-    .order("created_at", { ascending: false });
+  const result = await pool.query(`
+    SELECT *
+    FROM patients
+    ORDER BY created_at DESC
+  `);
 
-  if (error) throw error;
-  return data;
+  return result.rows;
 };
 
 // Get patient by ID
 export const getPatientById = async (id) => {
-  const { data, error } = await supabase
-    .from("patients")
-    .select("*")
-    .eq("id", id)
-    .single();
-  if (error) throw error;
+  const result = await pool.query(
+    `
+      SELECT *
+      FROM patients
+      WHERE id = $1
+    `,
+    [id],
+  );
 
-  return data;
+  return result.rows[0] || null;
 };
 
-//Create Patients
+// Create patient
 export const createPatient = async (patient) => {
-  const { data, error } = await supabase
-    .from("patients")
-    .insert([patient])
-    .select()
-    .single();
+  const result = await pool.query(
+    `
+      INSERT INTO patients (
+        name,
+        date_of_birth,
+        gender,
+        address,
+        phone_number
+      )
+      VALUES ($1, $2, $3, $4, $5)
+      RETURNING *
+    `,
+    [
+      patient.name,
+      patient.date_of_birth,
+      patient.gender,
+      patient.address,
+      patient.phone_number,
+    ],
+  );
 
-  if (error) return error;
-  return data;
+  return result.rows[0];
 };
 
 // Update patient
 export const updatePatientById = async (id, patient) => {
-  const { data, error } = await supabase
-    .from("patients")
-    .update(patient)
-    .eq("id", id)
-    .select()
-    .single();
-  if (error) throw error;
+  const result = await pool.query(
+    `
+      UPDATE patients
+      SET
+        name = $1,
+        date_of_birth = $2,
+        gender = $3,
+        address = $4,
+        phone_number = $5
+      WHERE id = $6
+      RETURNING *
+    `,
+    [
+      patient.name,
+      patient.date_of_birth,
+      patient.gender,
+      patient.address,
+      patient.phone_number,
+      id,
+    ],
+  );
 
-  return data;
+  return result.rows[0] || null;
 };
 
 // Delete patient
 export const deletePatientById = async (id) => {
-  const { data, error } = await supabase
-    .from("patients")
-    .delete()
-    .eq("id", id)
-    .select()
-    .single();
-  if (error) throw error;
+  const result = await pool.query(
+    `
+      DELETE FROM patients
+      WHERE id = $1
+      RETURNING *
+    `,
+    [id],
+  );
 
-  return data;
+  return result.rows[0] || null;
 };

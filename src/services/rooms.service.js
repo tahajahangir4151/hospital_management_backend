@@ -1,64 +1,76 @@
-import supabase from "../config/supabase.js";
+import pool from "../config/database.js";
 
-//Get All roooms
+// Get all rooms
 export const getRooms = async () => {
-  const { data, error } = await supabase
-    .from("rooms")
-    .select("*")
-    .order("created_at", { ascending: false });
+  const result = await pool.query(`
+    SELECT *
+    FROM rooms
+    ORDER BY created_at DESC
+  `);
 
-  if (error) throw error;
-  return data;
+  return result.rows;
 };
 
-//Create room
+// Create room
 export const createRoom = async (room) => {
-  const { data, error } = await supabase
-    .from("rooms")
-    .insert([room])
-    .select()
-    .single();
-  if (error) throw error;
-  return data;
+  const result = await pool.query(
+    `
+      INSERT INTO rooms (
+        room_number,
+        type,
+        daily_charge
+      )
+      VALUES ($1, $2, $3)
+      RETURNING *
+    `,
+    [room.room_number, room.type, room.daily_charge],
+  );
+
+  return result.rows[0];
 };
 
 // Get room by ID
 export const getRoomById = async (id) => {
-  const { data, error } = await supabase
-    .from("rooms")
-    .select("*")
-    .eq("id", id)
-    .single();
+  const result = await pool.query(
+    `
+      SELECT *
+      FROM rooms
+      WHERE id = $1
+    `,
+    [id],
+  );
 
-  if (error) throw error;
-
-  return data;
+  return result.rows[0] || null;
 };
 
 // Update room
 export const updateRoomById = async (id, room) => {
-  const { data, error } = await supabase
-    .from("rooms")
-    .update(room)
-    .eq("id", id)
-    .select()
-    .single();
+  const result = await pool.query(
+    `
+      UPDATE rooms
+      SET
+        room_number = $1,
+        type = $2,
+        daily_charge = $3
+      WHERE id = $4
+      RETURNING *
+    `,
+    [room.room_number, room.type, room.daily_charge, id],
+  );
 
-  if (error) throw error;
-
-  return data;
+  return result.rows[0] || null;
 };
 
 // Delete room
 export const deleteRoomById = async (id) => {
-  const { data, error } = await supabase
-    .from("rooms")
-    .delete()
-    .eq("id", id)
-    .select()
-    .single();
+  const result = await pool.query(
+    `
+      DELETE FROM rooms
+      WHERE id = $1
+      RETURNING *
+    `,
+    [id],
+  );
 
-  if (error) throw error;
-
-  return data;
+  return result.rows[0] || null;
 };

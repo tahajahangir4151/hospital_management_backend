@@ -1,5 +1,6 @@
 import express from "express";
-import supabase from "../config/supabase.js";
+import pool from "../config/database.js";
+
 const router = express.Router();
 
 /**
@@ -9,6 +10,7 @@ const router = express.Router();
  *     summary: Check API health
  *     tags:
  *       - Health
+ *     security: []
  *     responses:
  *       200:
  *         description: API is running successfully
@@ -24,7 +26,6 @@ const router = express.Router();
  *                   type: string
  *                   example: Hospital Management API is running
  */
-
 router.get("/", (req, res) => {
   res.status(200).json({
     success: true,
@@ -39,20 +40,16 @@ router.get("/", (req, res) => {
  *     summary: Check database connection
  *     tags:
  *       - Health
+ *     security: []
  *     responses:
  *       200:
  *         description: Database connection successful
  *       500:
  *         description: Database connection failed
  */
-
 router.get("/database", async (req, res) => {
   try {
-    const { error } = await supabase.from("departments").select("id").limit(1);
-
-    if (error) {
-      throw error;
-    }
+    await pool.query("SELECT 1");
 
     res.status(200).json({
       success: true,
@@ -65,8 +62,6 @@ router.get("/database", async (req, res) => {
       error: error.message,
     });
   }
-
-
 });
 
 export default router;

@@ -1,5 +1,6 @@
-import supabase from "../config/supabase.js";
+import pool from "../config/database.js";
 
+// Assign nurse to room
 export const createNurseRoomAssignment = async ({ nurse_id, room_id }) => {
   if (!nurse_id || !room_id) {
     const error = new Error("Nurse and room are required");
@@ -8,110 +9,104 @@ export const createNurseRoomAssignment = async ({ nurse_id, room_id }) => {
   }
 
   // Check nurse exists
-  const { data: nurse, error: nurseError } = await supabase
-    .from("nurses")
-    .select("*")
-    .eq("id", nurse_id)
-    .maybeSingle();
+  const nurseResult = await pool.query(
+    `
+      SELECT id
+      FROM nurses
+      WHERE id = $1
+    `,
+    [nurse_id],
+  );
 
-  if (nurseError) throw nurseError;
-
-  if (!nurse) {
+  if (nurseResult.rows.length === 0) {
     const error = new Error("Nurse not found");
     error.statusCode = 404;
     throw error;
   }
 
   // Check room exists
-  const { data: room, error: roomError } = await supabase
-    .from("rooms")
-    .select("*")
-    .eq("id", room_id)
-    .maybeSingle();
+  const roomResult = await pool.query(
+    `
+      SELECT id
+      FROM rooms
+      WHERE id = $1
+    `,
+    [room_id],
+  );
 
-  if (roomError) throw roomError;
-
-  if (!room) {
+  if (roomResult.rows.length === 0) {
     const error = new Error("Room not found");
     error.statusCode = 404;
     throw error;
   }
 
   // Check duplicate assignment
-  const { data: existingAssignment, error: existingAssignmentError } =
-    await supabase
-      .from("nurse_room_assignments")
-      .select("*")
-      .eq("nurse_id", nurse_id)
-      .eq("room_id", room_id)
-      .maybeSingle();
+  const existingResult = await pool.query(
+    `
+      SELECT id
+      FROM nurse_room_assignments
+      WHERE nurse_id = $1
+        AND room_id = $2
+    `,
+    [nurse_id, room_id],
+  );
 
-  if (existingAssignmentError) {
-    throw existingAssignmentError;
-  }
-
-  if (existingAssignment) {
+  if (existingResult.rows.length > 0) {
     const error = new Error("Nurse is already assigned to this room");
     error.statusCode = 409;
     throw error;
   }
 
   // Create assignment
-  const { data: assignment, error: assignmentError } = await supabase
-    .from("nurse_room_assignments")
-    .insert([
-      {
+  const result = await pool.query(
+    `
+      INSERT INTO nurse_room_assignments (
         nurse_id,
-        room_id,
-      },
-    ])
-    .select("*")
-    .single();
+        room_id
+      )
+      VALUES ($1, $2)
+      RETURNING *
+    `,
+    [nurse_id, room_id],
+  );
 
-  if (assignmentError) {
-    throw assignmentError;
-  }
-
-  return assignment;
+  return result.rows[0];
 };
 
+// Get rooms assigned to nurse
 export const getRoomsByNurseId = async (nurseId) => {
   // Check nurse exists
-  const { data: nurse, error: nurseError } = await supabase
-    .from("nurses")
-    .select("id")
-    .eq("id", nurseId)
-    .maybeSingle();
+  const nurseResult = await pool.query(
+    `
+      SELECT id
+      FROM nurses
+      WHERE id = $1
+    `,
+    [nurseId],
+  );
 
-  if (nurseError) {
-    throw nurseError;
-  }
-
-  if (!nurse) {
+  if (nurseResult.rows.length === 0) {
     const error = new Error("Nurse not found");
     error.statusCode = 404;
     throw error;
   }
 
-  // Get all rooms assigned to this nurse
-  const { data: assignments, error: assignmentError } = await supabase
-    .from("nurse_room_assignments")
-    .select(
-      `
-        rooms (*)
-      `,
-    )
-    .eq("nurse_id", nurseId)
-    .order("created_at", { ascending: false });
+  const result = await pool.query(
+    `
+      SELECT rooms.*
+      FROM nurse_room_assignments
+      INNER JOIN rooms
+        ON rooms.id = nurse_room_assignments.room_id
+      WHERE nurse_room_assignments.nurse_id = $1
+      ORDER BY nurse_room_assignments.created_at DESC
+    `,
+    [nurseId],
+  );
 
-  if (assignmentError) {
-    throw assignmentError;
-  }
-
-  return assignments.map((assignment) => assignment.rooms);
+  return result.rows;
 };
 
-//Remove nurse from room
+// Remove nurse from room
 export const removeNurseRoomAssigment = async (nurseId, roomId) => {
   if (!nurseId || !roomId) {
     const error = new Error("Nurse ID and Room ID are required");
@@ -119,31 +114,21 @@ export const removeNurseRoomAssigment = async (nurseId, roomId) => {
     throw error;
   }
 
-  // check if assignment exist
-  const { data: assignment, error: assignmentError } = await supabase
-    .from("nurse_room_assignments")
-    .select("id")
-    .eq("nurse_id", nurseId)
-    .eq("room_id", roomId)
-    .maybeSingle();
+  const result = await pool.query(
+    `
+      DELETE FROM nurse_room_assignments
+      WHERE nurse_id = $1
+        AND room_id = $2
+      RETURNING *
+    `,
+    [nurseId, roomId],
+  );
 
-  if (assignmentError) return assignmentError;
-
-  if (!assignment) {
+  if (result.rows.length === 0) {
     const error = new Error("Nurse is not assigned to this room");
     error.statusCode = 404;
     throw error;
   }
-  
-  // Remove relationship
-  const { error: deleteError } = await supabase
-    .from("nurse_room_assignments")
-    .delete()
-    .eq("id", assignment.id);
 
-  if (deleteError) {
-    throw deleteError;
-  }
-
-  return assignment;
+  return result.rows[0];
 };

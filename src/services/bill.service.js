@@ -1,45 +1,45 @@
-import supabase from "../config/supabase.js";
+import pool from "../config/database.js";
 
+// Get all bills
 export const getAllBills = async () => {
-  const { data, error } = await supabase
-    .from("bills")
-    .select(
-      `*, patients (
-        id,
-        name
-      )`,
-    )
-    .order("created_at", { ascending: false });
+  const result = await pool.query(`
+    SELECT
+      b.*,
+      json_build_object(
+        'id', p.id,
+        'name', p.name
+      ) AS patients
+    FROM bills b
+    LEFT JOIN patients p
+      ON b.patient_id = p.id
+    ORDER BY b.created_at DESC
+  `);
 
-  if (error) {
-    throw error;
-  }
-
-  return data;
+  return result.rows;
 };
 
+// Get bill by ID
 export const getBillById = async (id) => {
-  const { data, error } = await supabase
-    .from("bills")
-    .select(
-      `
-        *,
-        patients (
-          id,
-          name
-        )
-      `,
-    )
-    .eq("id", id)
-    .maybeSingle();
+  const result = await pool.query(
+    `
+      SELECT
+        b.*,
+        json_build_object(
+          'id', p.id,
+          'name', p.name
+        ) AS patients
+      FROM bills b
+      LEFT JOIN patients p
+        ON b.patient_id = p.id
+      WHERE b.id = $1
+    `,
+    [id],
+  );
 
-  if (error) {
-    throw error;
-  }
-
-  return data;
+  return result.rows[0] || null;
 };
 
+// Create bill
 export const createBill = async ({
   patient_id,
   total_amount,
@@ -55,17 +55,16 @@ export const createBill = async ({
   }
 
   // Check patient exists
-  const { data: patient, error: patientError } = await supabase
-    .from("patients")
-    .select("id")
-    .eq("id", patient_id)
-    .maybeSingle();
+  const patientResult = await pool.query(
+    `
+      SELECT id
+      FROM patients
+      WHERE id = $1
+    `,
+    [patient_id],
+  );
 
-  if (patientError) {
-    throw patientError;
-  }
-
-  if (!patient) {
+  if (patientResult.rows.length === 0) {
     const error = new Error("Patient not found");
     error.statusCode = 404;
     throw error;
@@ -73,103 +72,127 @@ export const createBill = async ({
 
   const billNumber = `BILL-${Date.now()}`;
 
-  const billData = {
-    bill_number: billNumber,
-    patient_id,
-    total_amount,
-    payment_status,
-  };
+  let result;
 
   if (date_issued) {
-    billData.date_issued = date_issued;
+    result = await pool.query(
+      `
+        INSERT INTO bills (
+          bill_number,
+          patient_id,
+          total_amount,
+          payment_status,
+          date_issued
+        )
+        VALUES ($1, $2, $3, $4, $5)
+        RETURNING *
+      `,
+      [billNumber, patient_id, total_amount, payment_status, date_issued],
+    );
+  } else {
+    result = await pool.query(
+      `
+        INSERT INTO bills (
+          bill_number,
+          patient_id,
+          total_amount,
+          payment_status
+        )
+        VALUES ($1, $2, $3, $4)
+        RETURNING *
+      `,
+      [billNumber, patient_id, total_amount, payment_status],
+    );
   }
 
-  const { data, error } = await supabase
-    .from("bills")
-    .insert(billData)
-    .select()
-    .single();
-
-  if (error) {
-    throw error;
-  }
-
-  return data;
+  return result.rows[0];
 };
 
+// Update bill
 export const updateBillById = async (
   id,
   { total_amount, payment_status, date_issued },
 ) => {
-  const updateData = {};
+  const fields = [];
+  const values = [];
 
   if (total_amount !== undefined) {
-    updateData.total_amount = total_amount;
+    values.push(total_amount);
+    fields.push(`total_amount = $${values.length}`);
   }
 
   if (payment_status !== undefined) {
-    updateData.payment_status = payment_status;
+    values.push(payment_status);
+    fields.push(`payment_status = $${values.length}`);
   }
 
   if (date_issued !== undefined) {
-    updateData.date_issued = date_issued;
+    values.push(date_issued);
+    fields.push(`date_issued = $${values.length}`);
   }
 
-  const { data, error } = await supabase
-    .from("bills")
-    .update(updateData)
-    .eq("id", id)
-    .select()
-    .maybeSingle();
-
-  if (error) {
+  if (fields.length === 0) {
+    const error = new Error("No fields provided to update");
+    error.statusCode = 400;
     throw error;
   }
 
-  return data;
+  values.push(id);
+
+  const result = await pool.query(
+    `
+      UPDATE bills
+      SET ${fields.join(", ")}
+      WHERE id = $${values.length}
+      RETURNING *
+    `,
+    values,
+  );
+
+  return result.rows[0] || null;
 };
 
+// Delete bill
 export const deleteBillById = async (id) => {
-  const { data, error } = await supabase
-    .from("bills")
-    .delete()
-    .eq("id", id)
-    .select()
-    .maybeSingle();
+  const result = await pool.query(
+    `
+      DELETE FROM bills
+      WHERE id = $1
+      RETURNING *
+    `,
+    [id],
+  );
 
-  if (error) {
-    throw error;
-  }
-
-  return data;
+  return result.rows[0] || null;
 };
 
+// Get bills by patient ID
 export const getBillsByPatientId = async (patientId) => {
-  const { data: patient, error: patientError } = await supabase
-    .from("patients")
-    .select("id")
-    .eq("id", patientId)
-    .maybeSingle();
+  // Check patient exists
+  const patientResult = await pool.query(
+    `
+      SELECT id
+      FROM patients
+      WHERE id = $1
+    `,
+    [patientId],
+  );
 
-  if (patientError) {
-    throw patientError;
-  }
-
-  if (!patient) {
+  if (patientResult.rows.length === 0) {
     const error = new Error("Patient not found");
     error.statusCode = 404;
     throw error;
   }
 
-  const { data, error } = await supabase
-    .from("bills")
-    .select("*")
-    .eq("patient_id", patientId)
-    .order("date_issued", { ascending: false });
+  const result = await pool.query(
+    `
+      SELECT *
+      FROM bills
+      WHERE patient_id = $1
+      ORDER BY date_issued DESC
+    `,
+    [patientId],
+  );
 
-  if (error) {
-    throw error;
-  }
-
-  return data;
+  return result.rows;
 };

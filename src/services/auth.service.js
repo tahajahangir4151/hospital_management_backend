@@ -1,66 +1,77 @@
-import supabase from "../config/supabase.js";
-import supabaseAuth from "../config/supabaseAuth.js";
+import bcrypt from "bcrypt";
+import jwt from "jsonwebtoken";
+import pool from "../config/database.js";
 
 export const loginAdmin = async ({ email, password }) => {
-  // Validate required fields
   if (!email || !password) {
     const error = new Error("Email and password are required");
     error.statusCode = 400;
     throw error;
   }
 
-  // Login through Supabase Auth
-  const { data: authData, error: authError } =
-    await supabaseAuth.auth.signInWithPassword({
-      email,
-      password,
-    });
+  // Find user in local PostgreSQL
+  const result = await pool.query(
+    `
+      SELECT
+        id,
+        full_name,
+        email,
+        password_hash,
+        role
+      FROM users
+      WHERE LOWER(email) = LOWER($1)
+      LIMIT 1
+    `,
+    [email],
+  );
 
-  if (authError) {
+  const user = result.rows[0];
+
+  if (!user) {
     const error = new Error("Invalid email or password");
     error.statusCode = 401;
     throw error;
   }
 
-  const user = authData.user;
-  const session = authData.session;
+  // Compare plain password with stored bcrypt hash
+  const passwordMatches = await bcrypt.compare(password, user.password_hash);
 
-  // Get application profile
-  const { data: profile, error: profileError } = await supabase
-    .from("profiles")
-    .select("*")
-    .eq("id", user.id)
-    .maybeSingle();
-
-  if (profileError) {
-    throw profileError;
-  }
-
-  if (!profile) {
-    const error = new Error("User profile not found");
-    error.statusCode = 404;
+  if (!passwordMatches) {
+    const error = new Error("Invalid email or password");
+    error.statusCode = 401;
     throw error;
   }
 
-  // For now only admins can access the application
-  if (profile.role !== "admin") {
+  // For now only admin can access panel
+  if (user.role !== "admin") {
     const error = new Error("You are not authorized to access the admin panel");
     error.statusCode = 403;
     throw error;
   }
 
+  // Generate JWT
+  const accessToken = jwt.sign(
+    {
+      id: user.id,
+      email: user.email,
+      role: user.role,
+    },
+    process.env.JWT_SECRET,
+    {
+      expiresIn: process.env.JWT_EXPIRES_IN || "1d",
+    },
+  );
+
   return {
     user: {
       id: user.id,
       email: user.email,
-      full_name: profile.full_name,
-      role: profile.role,
+      full_name: user.full_name,
+      role: user.role,
     },
 
     session: {
-      access_token: session.access_token,
-      refresh_token: session.refresh_token,
-      expires_at: session.expires_at,
+      access_token: accessToken,
     },
   };
 };

@@ -1,16 +1,17 @@
-import supabase from "../config/supabase.js";
+import pool from "../config/database.js";
 
-//Get All admissions
+// Get all admissions
 export const getAdmissions = async () => {
-  const { data, error } = await supabase
-    .from("room_assignments")
-    .select("*")
-    .order("admission_date", { ascending: "false" });
-  if (error) throw error;
-  return data;
+  const result = await pool.query(`
+    SELECT *
+    FROM room_assignments
+    ORDER BY admission_date DESC
+  `);
+
+  return result.rows;
 };
 
-//Admit Patient
+// Admit patient
 export const admitPatient = async ({ patient_id, room_id, admission_date }) => {
   if (!patient_id || !room_id) {
     const error = new Error("Patient and room are required");
@@ -18,168 +19,178 @@ export const admitPatient = async ({ patient_id, room_id, admission_date }) => {
     throw error;
   }
 
-  //Patient existnece check
-  const { data: patient, error: patientError } = await supabase
-    .from("patients")
-    .select("id")
-    .eq("id", patient_id)
-    .maybeSingle();
+  // Check patient exists
+  const patientResult = await pool.query(
+    `
+      SELECT id
+      FROM patients
+      WHERE id = $1
+    `,
+    [patient_id],
+  );
 
-  if (patientError) throw patientError;
-
-  if (!patient) {
+  if (patientResult.rows.length === 0) {
     const error = new Error("Patient not found");
     error.statusCode = 404;
     throw error;
   }
 
-  //Room existence check
-  const { data: room, error: roomError } = await supabase
-    .from("rooms")
-    .select("id", "room_number", "type")
-    .eq("id", room_id)
-    .maybeSingle();
+  // Check room exists
+  const roomResult = await pool.query(
+    `
+      SELECT id, room_number, type
+      FROM rooms
+      WHERE id = $1
+    `,
+    [room_id],
+  );
 
-  if (roomError) throw roomError;
+  const room = roomResult.rows[0];
+
   if (!room) {
     const error = new Error("Room not found");
     error.statusCode = 404;
     throw error;
   }
 
-  //check patient donot have an already active admission
-  const { data: activePatientAdmission, error: activePatientError } =
-    await supabase
-      .from("room_assignments")
-      .select("id", "room_id")
-      .eq("patient_id", patient_id)
-      .is("discharge_date", null)
-      .maybeSingle();
+  // Check patient does not already have an active admission
+  const activePatientResult = await pool.query(
+    `
+      SELECT id, room_id
+      FROM room_assignments
+      WHERE patient_id = $1
+        AND discharge_date IS NULL
+      LIMIT 1
+    `,
+    [patient_id],
+  );
 
-  if (activePatientError) throw activePatientError;
-
-  if (activePatientAdmission) {
+  if (activePatientResult.rows.length > 0) {
     const error = new Error("Patient already has an active room assignment");
     error.statusCode = 409;
     throw error;
   }
 
   // Get active admissions for selected room
-  const { data: activeRoomAdmissions, error: activeRoomError } = await supabase
-    .from("room_assignments")
-    .select("id")
-    .eq("room_id", room_id)
-    .is("discharge_date", null);
+  const activeRoomResult = await pool.query(
+    `
+      SELECT id
+      FROM room_assignments
+      WHERE room_id = $1
+        AND discharge_date IS NULL
+    `,
+    [room_id],
+  );
 
-  if (activeRoomError) throw activeRoomError;
-
-  // General rooms can contain multiple patients.
-  // Private / ICU / other room types can only have one active patient.
+  // General room can contain multiple patients.
+  // Other room types can have only one active patient.
   if (
     room.type?.toLowerCase() !== "general" &&
-    activeRoomAdmissions.length > 0
+    activeRoomResult.rows.length > 0
   ) {
     const error = new Error("Room is currently occupied");
     error.statusCode = 409;
     throw error;
   }
 
-  // Prepare admission data
-  const admissionData = {
-    patient_id,
-    room_id,
-  };
+  let result;
 
+  // If admin provides admission date
   if (admission_date) {
-    admissionData.admission_date = admission_date;
+    result = await pool.query(
+      `
+        INSERT INTO room_assignments (
+          patient_id,
+          room_id,
+          admission_date
+        )
+        VALUES ($1, $2, $3)
+        RETURNING *
+      `,
+      [patient_id, room_id, admission_date],
+    );
+  } else {
+    // Let PostgreSQL use the default admission_date
+    result = await pool.query(
+      `
+        INSERT INTO room_assignments (
+          patient_id,
+          room_id
+        )
+        VALUES ($1, $2)
+        RETURNING *
+      `,
+      [patient_id, room_id],
+    );
   }
 
-  // Create room assignment
-  const { data: admission, error: admissionError } = await supabase
-    .from("room_assignments")
-    .insert([admissionData])
-    .select()
-    .single();
-
-  if (admissionError) {
-    throw admissionError;
-  }
-
-  return admission;
+  return result.rows[0];
 };
 
-//Discharge Patient
+// Discharge patient
 export const dischargePatient = async (admissionId) => {
-  const { data: admission, error: admissionError } = await supabase
-    .from("room_assignments")
-    .select("*")
-    .eq("id", admissionId)
-    .is("discharge_date", null)
-    .maybeSingle();
+  const result = await pool.query(
+    `
+      UPDATE room_assignments
+      SET discharge_date = NOW()
+      WHERE id = $1
+        AND discharge_date IS NULL
+      RETURNING *
+    `,
+    [admissionId],
+  );
 
-  if (admissionError) {
-    throw admissionError;
-  }
-
-  if (!admission) {
+  if (result.rows.length === 0) {
     const error = new Error("Active admission not found");
-
     error.statusCode = 404;
     throw error;
   }
 
-  const { data: dischargedAdmission, error: dischargeError } = await supabase
-    .from("room_assignments")
-    .update({
-      discharge_date: new Date().toISOString(),
-    })
-    .eq("id", admissionId)
-    .select("*")
-    .single();
-
-  if (dischargeError) {
-    throw dischargeError;
-  }
-
-  return dischargedAdmission;
+  return result.rows[0];
 };
 
-//Get admission history
+// Get admission history for patient
 export const getAdmissionsByPatientId = async (patientId) => {
-  const { data, error } = await supabase
-    .from("room_assignments")
-    .select("*")
-    .eq("patient_id", patientId)
-    .order("admission_date", { ascending: false });
+  const result = await pool.query(
+    `
+      SELECT *
+      FROM room_assignments
+      WHERE patient_id = $1
+      ORDER BY admission_date DESC
+    `,
+    [patientId],
+  );
 
-  if (error) throw error;
-
-  return data;
+  return result.rows;
 };
 
-//Get admission history by room id
+// Get admission history for room
 export const getAdmissionsByRoomId = async (roomId) => {
-  const { data, error } = await supabase
-    .from("room_assignments")
-    .select("*")
-    .eq("room_id", roomId)
-    .order("admission_date", { ascending: false });
+  const result = await pool.query(
+    `
+      SELECT *
+      FROM room_assignments
+      WHERE room_id = $1
+      ORDER BY admission_date DESC
+    `,
+    [roomId],
+  );
 
-  if (error) throw error;
-
-  return data;
+  return result.rows;
 };
 
-//Get current room ouccupant
+// Get current room occupants
 export const getRoomOccupants = async (roomId) => {
-  const { data, error } = await supabase
-    .from("room_assignments")
-    .select("*")
-    .eq("room_id", roomId)
-    .is("discharge_date", null)
-    .order("admission_date", { ascending: false });
+  const result = await pool.query(
+    `
+      SELECT *
+      FROM room_assignments
+      WHERE room_id = $1
+        AND discharge_date IS NULL
+      ORDER BY admission_date DESC
+    `,
+    [roomId],
+  );
 
-  if (error) throw error;
-
-  return data;
+  return result.rows;
 };

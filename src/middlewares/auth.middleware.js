@@ -1,5 +1,5 @@
-import supabase from "../config/supabase.js";
-import supabaseAuth from "../config/supabaseAuth.js";
+import jwt from "jsonwebtoken";
+import pool from "../config/database.js";
 
 export const authenticateAdmin = async (req, res, next) => {
   try {
@@ -14,36 +14,41 @@ export const authenticateAdmin = async (req, res, next) => {
 
     const token = authHeader.split(" ")[1];
 
-    const {
-      data: { user },
-      error: authError,
-    } = await supabaseAuth.auth.getUser(token);
+    let decoded;
 
-    if (authError || !user) {
+    try {
+      decoded = jwt.verify(token, process.env.JWT_SECRET);
+    } catch {
       return res.status(401).json({
         success: false,
         message: "Invalid or expired token",
       });
     }
 
-    const { data: profile, error: profileError } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("id", user.id)
-      .maybeSingle();
+    // Get user from local PostgreSQL
+    const result = await pool.query(
+      `
+        SELECT
+          id,
+          full_name,
+          email,
+          role
+        FROM users
+        WHERE id = $1
+      `,
+      [decoded.id],
+    );
 
-    if (profileError) {
-      throw profileError;
-    }
+    const user = result.rows[0];
 
-    if (!profile) {
-      return res.status(404).json({
+    if (!user) {
+      return res.status(401).json({
         success: false,
-        message: "User profile not found",
+        message: "User not found",
       });
     }
 
-    if (profile.role !== "admin") {
+    if (user.role !== "admin") {
       return res.status(403).json({
         success: false,
         message: "Admin access required",
@@ -53,13 +58,13 @@ export const authenticateAdmin = async (req, res, next) => {
     req.user = {
       id: user.id,
       email: user.email,
-      full_name: profile.full_name,
-      role: profile.role,
+      full_name: user.full_name,
+      role: user.role,
     };
 
     next();
   } catch (error) {
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: "Authentication failed",
       error: error.message,

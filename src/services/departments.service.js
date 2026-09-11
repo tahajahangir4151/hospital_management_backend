@@ -1,4 +1,3 @@
-import supabase from "../config/supabase.js";
 import pool from "../config/database.js";
 
 //Get All Departments

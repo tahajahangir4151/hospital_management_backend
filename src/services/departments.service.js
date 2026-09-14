@@ -1,69 +1,58 @@
 import pool from "../config/database.js";
+import prisma from "../config/prisma.js";
 
 //Get All Departments
 export const getDepartments = async () => {
-  const result = await pool.query(
-    `SELECT * FROM departments  ORDER BY created_at DESC`,
-  );
-  return result.rows;
+  const departments = await prisma.departments.findMany({
+    orderBy: {
+      created_at: "desc",
+    },
+  });
+  return departments;
 };
 
 //Get Single Department via id
 export const getDepartmentById = async (id) => {
-  const result = await pool.query(
-    `
-    SELECT * FROM departments WHERE id = $1`,
-    [id],
-  );
-
-  return result.rows[0] || null;
+  const department = await prisma.departments.findUnique({
+    where: {
+      id,
+    },
+  });
+  return department;
 };
 
 //Create Deparmtent
 export const createDepartment = async (department) => {
-  const result = await pool.query(
-    `
-  INSERT INTO departments(
-  name,
-  location,
-  contact_number
-  )
-  VALUES($1,$2,$3)
-  RETURNING *
-  `,
-    [department.name, department.location, department.contact_number],
-  );
-  return result.rows[0];
+  const newDepartment = await prisma.departments.create({
+    data: {
+      name: department.name,
+      location: department.location,
+      contact_number: department.contact_number,
+    },
+  });
+
+  return newDepartment;
 };
 
 //Updae department
 export const updateDepartment = async (id, department) => {
-  const result = await pool.query(
-    `
-      UPDATE departments
-      SET
-        name = $1,
-        location = $2,
-        contact_number = $3
-      WHERE id = $4
-      RETURNING *
-    `,
-    [department.name, department.location, department.contact_number, id],
-  );
-
-  return result.rows[0] || null;
+  const updatedDepartment = await prisma.departments.update({
+    where: {
+      id,
+    },
+    data: {
+      name: department.name,
+      location: department.location,
+      contact_number: department.contact_number,
+    },
+  });
+  return updatedDepartment;
 };
 
 //Delete any department
 export const deleteDepartment = async (id) => {
-  const result = await pool.query(
-    `
-      DELETE FROM departments
-      WHERE id = $1
-      RETURNING *
-    `,
-    [id],
-  );
-
-  return result.rows[0] || null;
+  const deletedDepartment = await prisma.departments.delete({
+    where: { id },
+  });
+  return deletedDepartment;
 };

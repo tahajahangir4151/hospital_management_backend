@@ -1,0 +1,122 @@
+generator client {
+  provider        = "prisma-client"
+  output          = "../generated/prisma"
+  previewFeatures = ["partialIndexes"]
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model bills {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  bill_number    String    @unique @db.VarChar(50)
+  patient_id     String    @db.Uuid
+  total_amount   Decimal   @db.Decimal(10, 2)
+  payment_status String    @db.VarChar(20)
+  date_issued    DateTime  @default(dbgenerated("CURRENT_DATE")) @db.Date
+  created_at     DateTime? @default(now()) @db.Timestamptz(6)
+  patients       patients  @relation(fields: [patient_id], references: [id], onUpdate: NoAction)
+}
+
+model departments {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name           String    @db.VarChar(100)
+  location       String    @db.VarChar(150)
+  contact_number String    @db.VarChar(20)
+  created_at     DateTime? @default(now()) @db.Timestamptz(6)
+  doctors        doctors[]
+  nurses         nurses[]
+}
+
+model doctors {
+  id                  String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  full_name           String       @db.VarChar(150)
+  specialization      String       @db.VarChar(100)
+  years_of_experience Int
+  contact_number      String       @db.VarChar(20)
+  department_id       String       @db.Uuid
+  created_at          DateTime?    @default(now()) @db.Timestamptz(6)
+  departments         departments  @relation(fields: [department_id], references: [id], onUpdate: NoAction)
+  treatments          treatments[]
+}
+
+model nurse_room_assignments {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  nurse_id   String    @db.Uuid
+  room_id    String    @db.Uuid
+  created_at DateTime? @default(now()) @db.Timestamptz(6)
+  nurses     nurses    @relation(fields: [nurse_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "nurse_room_assignments_nurse_fkey")
+  rooms      rooms     @relation(fields: [room_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "nurse_room_assignments_room_fkey")
+
+  @@unique([nurse_id, room_id], map: "unique_nurse_room_assignment")
+}
+
+model nurses {
+  id                     String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name                   String                   @db.VarChar(150)
+  shift_timing           String                   @db.VarChar(100)
+  contact_number         String                   @db.VarChar(20)
+  department_id          String                   @db.Uuid
+  created_at             DateTime?                @default(now()) @db.Timestamptz(6)
+  nurse_room_assignments nurse_room_assignments[]
+  departments            departments              @relation(fields: [department_id], references: [id], onUpdate: NoAction)
+}
+
+model patients {
+  id               String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name             String            @db.VarChar(150)
+  date_of_birth    DateTime          @db.Date
+  gender           String            @db.VarChar(20)
+  address          String
+  phone_number     String            @db.VarChar(20)
+  created_at       DateTime?         @default(now()) @db.Timestamptz(6)
+  bills            bills[]
+  room_assignments room_assignments?
+  treatments       treatments[]
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model room_assignments {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  patient_id     String    @unique(map: "one_active_room_per_patient", where: raw("(discharge_date IS NULL)")) @db.Uuid
+  room_id        String    @db.Uuid
+  admission_date DateTime  @default(now()) @db.Timestamptz(6)
+  discharge_date DateTime? @db.Timestamptz(6)
+  created_at     DateTime? @default(now()) @db.Timestamptz(6)
+  patients       patients  @relation(fields: [patient_id], references: [id], onUpdate: NoAction, map: "room_assignments_patient_fkey")
+  rooms          rooms     @relation(fields: [room_id], references: [id], onUpdate: NoAction, map: "room_assignments_room_fkey")
+}
+
+model rooms {
+  id                     String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  room_number            String                   @unique @db.VarChar(20)
+  type                   String                   @db.VarChar(30)
+  daily_charge           Decimal                  @db.Decimal(10, 2)
+  created_at             DateTime?                @default(now()) @db.Timestamptz(6)
+  nurse_room_assignments nurse_room_assignments[]
+  room_assignments       room_assignments[]
+}
+
+model treatments {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  doctor_id      String    @db.Uuid
+  patient_id     String    @db.Uuid
+  treatment_date DateTime  @db.Date
+  diagnosis      String
+  medication     String?
+  created_at     DateTime? @default(now()) @db.Timestamptz(6)
+  doctors        doctors   @relation(fields: [doctor_id], references: [id], onUpdate: NoAction)
+  patients       patients  @relation(fields: [patient_id], references: [id], onUpdate: NoAction)
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model users {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  full_name     String    @db.VarChar(150)
+  email         String    @unique @db.VarChar(255)
+  password_hash String
+  role          String    @db.VarChar(30)
+  created_at    DateTime? @default(now()) @db.Timestamptz(6)
+}

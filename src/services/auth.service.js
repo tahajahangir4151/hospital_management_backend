@@ -1,6 +1,6 @@
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
-import pool from "../config/database.js";
+import prisma from "../config/prisma.js";
 
 export const loginAdmin = async ({ email, password }) => {
   if (!email || !password) {
@@ -9,23 +9,22 @@ export const loginAdmin = async ({ email, password }) => {
     throw error;
   }
 
-  // Find user in local PostgreSQL
-  const result = await pool.query(
-    `
-      SELECT
-        id,
-        full_name,
-        email,
-        password_hash,
-        role
-      FROM users
-      WHERE LOWER(email) = LOWER($1)
-      LIMIT 1
-    `,
-    [email],
-  );
-
-  const user = result.rows[0];
+  // Find user by email
+  const user = await prisma.users.findFirst({
+    where: {
+      email: {
+        equals: email,
+        mode: "insensitive",
+      },
+    },
+    select: {
+      id: true,
+      full_name: true,
+      email: true,
+      password_hash: true,
+      role: true,
+    },
+  });
 
   if (!user) {
     const error = new Error("Invalid email or password");
@@ -33,7 +32,7 @@ export const loginAdmin = async ({ email, password }) => {
     throw error;
   }
 
-  // Compare plain password with stored bcrypt hash
+  // Compare password with bcrypt hash
   const passwordMatches = await bcrypt.compare(password, user.password_hash);
 
   if (!passwordMatches) {
@@ -42,7 +41,7 @@ export const loginAdmin = async ({ email, password }) => {
     throw error;
   }
 
-  // For now only admin can access panel
+  // Only admin can access admin panel
   if (user.role !== "admin") {
     const error = new Error("You are not authorized to access the admin panel");
     error.statusCode = 403;
@@ -69,7 +68,6 @@ export const loginAdmin = async ({ email, password }) => {
       full_name: user.full_name,
       role: user.role,
     },
-
     session: {
       access_token: accessToken,
     },

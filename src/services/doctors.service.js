@@ -1,108 +1,94 @@
-import pool from "../config/database.js";
+import prisma from "../config/prisma.js";
 
 // Get all doctors
 export const getAllDoctors = async () => {
-  const result = await pool.query(`
-    SELECT *
-    FROM doctors
-    ORDER BY created_at DESC
-  `);
-
-  return result.rows;
+  const getDoctors = await prisma.doctors.findMany({
+    orderBy: {
+      created_at: "desc",
+    },
+  });
+  return getDoctors;
 };
 
 // Get single doctor
 export const getDoctorById = async (id) => {
-  const result = await pool.query(
-    `
-      SELECT *
-      FROM doctors
-      WHERE id = $1
-    `,
-    [id],
-  );
-
-  return result.rows[0] || null;
+  const getSingleDoctor = await prisma.doctors.findUnique({
+    where: {
+      id,
+    },
+  });
+  return getSingleDoctor;
 };
 
 // Get doctors by department id
 export const getDoctorByDepartmentId = async (departmentId) => {
-  const result = await pool.query(
-    `
-      SELECT *
-      FROM doctors
-      WHERE department_id = $1
-      ORDER BY created_at DESC
-    `,
-    [departmentId],
-  );
-
-  return result.rows;
+  const doctors = await prisma.doctors.findMany({
+    where: {
+      department_id: departmentId,
+    },
+    orderBy: {
+      created_at: "desc",
+    },
+  });
+  return doctors;
 };
 
 // Create doctor
 export const createDoctor = async (doctor) => {
-  const result = await pool.query(
-    `
-      INSERT INTO doctors (
-        full_name,
-        specialization,
-        years_of_experience,
-        contact_number,
-        department_id
-      )
-      VALUES ($1, $2, $3, $4, $5)
-      RETURNING *
-    `,
-    [
-      doctor.full_name,
-      doctor.specialization,
-      doctor.years_of_experience,
-      doctor.contact_number,
-      doctor.department_id,
-    ],
-  );
+  const newDoctor = await prisma.doctors.create({
+    data: {
+      full_name: doctor.full_name,
+      specialization: doctor.specialization,
+      years_of_experience: doctor.years_of_experience,
+      contact_number: doctor.contact_number,
+      department_id: doctor.department_id,
+    },
+  });
 
-  return result.rows[0];
+  return newDoctor;
 };
 
 // Update doctor
 export const updateDoctorById = async (id, doctor) => {
-  const result = await pool.query(
-    `
-      UPDATE doctors
-      SET
-        full_name = $1,
-        specialization = $2,
-        years_of_experience = $3,
-        contact_number = $4,
-        department_id = $5
-      WHERE id = $6
-      RETURNING *
-    `,
-    [
-      doctor.full_name,
-      doctor.specialization,
-      doctor.years_of_experience,
-      doctor.contact_number,
-      doctor.department_id,
-      id,
-    ],
-  );
+  try {
+    const updatedDoctor = await prisma.doctors.update({
+      where: {
+        id,
+      },
+      data: {
+        full_name: doctor.full_name,
+        specialization: doctor.specialization,
+        years_of_experience: doctor.years_of_experience,
+        contact_number: doctor.contact_number,
+        department_id: doctor.department_id,
+      },
+    });
 
-  return result.rows[0] || null;
+    return updatedDoctor;
+  } catch (error) {
+    if (error.code === "P2025") {
+      return null;
+    }
+
+    throw error;
+  }
 };
 
 // Delete doctor
 export const deleteDoctor = async (id) => {
-  const result = await pool.query(
-    `
-      DELETE FROM doctors
-      WHERE id = $1
-      RETURNING *
-    `,
-    [id],
-  );
+  try {
+    const deletedDoctor = await prisma.doctors.delete({
+      where: {
+        id,
+      },
+    });
 
-  return result.rows[0] || null;
+    return deletedDoctor;
+  } catch (error) {
+    if (error.code === "P2025") {
+      return null;
+    }
+
+    throw error;
+  }
 };

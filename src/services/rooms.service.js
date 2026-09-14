@@ -1,76 +1,79 @@
-import pool from "../config/database.js";
+import prisma from "../config/prisma.js";
 
 // Get all rooms
 export const getRooms = async () => {
-  const result = await pool.query(`
-    SELECT *
-    FROM rooms
-    ORDER BY created_at DESC
-  `);
+  const rooms = await prisma.rooms.findMany({
+    orderBy: {
+      created_at: "desc",
+    },
+  });
 
-  return result.rows;
+  return rooms;
 };
 
 // Create room
 export const createRoom = async (room) => {
-  const result = await pool.query(
-    `
-      INSERT INTO rooms (
-        room_number,
-        type,
-        daily_charge
-      )
-      VALUES ($1, $2, $3)
-      RETURNING *
-    `,
-    [room.room_number, room.type, room.daily_charge],
-  );
+  const newRoom = await prisma.rooms.create({
+    data: {
+      room_number: room.room_number,
+      type: room.type,
+      daily_charge: room.daily_charge,
+    },
+  });
 
-  return result.rows[0];
+  return newRoom;
 };
 
 // Get room by ID
 export const getRoomById = async (id) => {
-  const result = await pool.query(
-    `
-      SELECT *
-      FROM rooms
-      WHERE id = $1
-    `,
-    [id],
-  );
+  const room = await prisma.rooms.findUnique({
+    where: {
+      id,
+    },
+  });
 
-  return result.rows[0] || null;
+  return room;
 };
 
 // Update room
 export const updateRoomById = async (id, room) => {
-  const result = await pool.query(
-    `
-      UPDATE rooms
-      SET
-        room_number = $1,
-        type = $2,
-        daily_charge = $3
-      WHERE id = $4
-      RETURNING *
-    `,
-    [room.room_number, room.type, room.daily_charge, id],
-  );
+  try {
+    const updatedRoom = await prisma.rooms.update({
+      where: {
+        id,
+      },
+      data: {
+        room_number: room.room_number,
+        type: room.type,
+        daily_charge: room.daily_charge,
+      },
+    });
 
-  return result.rows[0] || null;
+    return updatedRoom;
+  } catch (error) {
+    if (error.code === "P2025") {
+      return null;
+    }
+
+    throw error;
+  }
 };
 
 // Delete room
 export const deleteRoomById = async (id) => {
-  const result = await pool.query(
-    `
-      DELETE FROM rooms
-      WHERE id = $1
-      RETURNING *
-    `,
-    [id],
-  );
+  try {
+    const deletedRoom = await prisma.rooms.delete({
+      where: {
+        id,
+      },
+    });
 
-  return result.rows[0] || null;
+    return deletedRoom;
+  } catch (error) {
+    if (error.code === "P2025") {
+      return null;
+    }
+
+    throw error;
+  }
 };

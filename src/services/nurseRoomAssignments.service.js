@@ -1,4 +1,4 @@
-import pool from "../config/database.js";
+import prisma from "../config/prisma.js";
 
 // Assign nurse to room
 export const createNurseRoomAssignment = async ({ nurse_id, room_id }) => {
@@ -9,101 +9,96 @@ export const createNurseRoomAssignment = async ({ nurse_id, room_id }) => {
   }
 
   // Check nurse exists
-  const nurseResult = await pool.query(
-    `
-      SELECT id
-      FROM nurses
-      WHERE id = $1
-    `,
-    [nurse_id],
-  );
+  const nurse = await prisma.nurses.findUnique({
+    where: {
+      id: nurse_id,
+    },
+    select: {
+      id: true,
+    },
+  });
 
-  if (nurseResult.rows.length === 0) {
+  if (!nurse) {
     const error = new Error("Nurse not found");
     error.statusCode = 404;
     throw error;
   }
 
   // Check room exists
-  const roomResult = await pool.query(
-    `
-      SELECT id
-      FROM rooms
-      WHERE id = $1
-    `,
-    [room_id],
-  );
+  const room = await prisma.rooms.findUnique({
+    where: {
+      id: room_id,
+    },
+    select: {
+      id: true,
+    },
+  });
 
-  if (roomResult.rows.length === 0) {
+  if (!room) {
     const error = new Error("Room not found");
     error.statusCode = 404;
     throw error;
   }
 
   // Check duplicate assignment
-  const existingResult = await pool.query(
-    `
-      SELECT id
-      FROM nurse_room_assignments
-      WHERE nurse_id = $1
-        AND room_id = $2
-    `,
-    [nurse_id, room_id],
-  );
+  const existingAssignment = await prisma.nurse_room_assignments.findFirst({
+    where: {
+      nurse_id,
+      room_id,
+    },
+    select: {
+      id: true,
+    },
+  });
 
-  if (existingResult.rows.length > 0) {
+  if (existingAssignment) {
     const error = new Error("Nurse is already assigned to this room");
     error.statusCode = 409;
     throw error;
   }
 
   // Create assignment
-  const result = await pool.query(
-    `
-      INSERT INTO nurse_room_assignments (
-        nurse_id,
-        room_id
-      )
-      VALUES ($1, $2)
-      RETURNING *
-    `,
-    [nurse_id, room_id],
-  );
+  const assignment = await prisma.nurse_room_assignments.create({
+    data: {
+      nurse_id,
+      room_id,
+    },
+  });
 
-  return result.rows[0];
+  return assignment;
 };
 
 // Get rooms assigned to nurse
 export const getRoomsByNurseId = async (nurseId) => {
   // Check nurse exists
-  const nurseResult = await pool.query(
-    `
-      SELECT id
-      FROM nurses
-      WHERE id = $1
-    `,
-    [nurseId],
-  );
+  const nurse = await prisma.nurses.findUnique({
+    where: {
+      id: nurseId,
+    },
+    select: {
+      id: true,
+    },
+  });
 
-  if (nurseResult.rows.length === 0) {
+  if (!nurse) {
     const error = new Error("Nurse not found");
     error.statusCode = 404;
     throw error;
   }
 
-  const result = await pool.query(
-    `
-      SELECT rooms.*
-      FROM nurse_room_assignments
-      INNER JOIN rooms
-        ON rooms.id = nurse_room_assignments.room_id
-      WHERE nurse_room_assignments.nurse_id = $1
-      ORDER BY nurse_room_assignments.created_at DESC
-    `,
-    [nurseId],
-  );
+  const assignments = await prisma.nurse_room_assignments.findMany({
+    where: {
+      nurse_id: nurseId,
+    },
+    include: {
+      rooms: true,
+    },
+    orderBy: {
+      created_at: "desc",
+    },
+  });
 
-  return result.rows;
+  return assignments.map((assignment) => assignment.rooms);
 };
 
 // Remove nurse from room
@@ -114,21 +109,21 @@ export const removeNurseRoomAssigment = async (nurseId, roomId) => {
     throw error;
   }
 
-  const result = await pool.query(
-    `
-      DELETE FROM nurse_room_assignments
-      WHERE nurse_id = $1
-        AND room_id = $2
-      RETURNING *
-    `,
-    [nurseId, roomId],
-  );
+  const result = await prisma.nurse_room_assignments.deleteMany({
+    where: {
+      nurse_id: nurseId,
+      room_id: roomId,
+    },
+  });
 
-  if (result.rows.length === 0) {
+  if (result.count === 0) {
     const error = new Error("Nurse is not assigned to this room");
     error.statusCode = 404;
     throw error;
   }
 
-  return result.rows[0];
+  return {
+    nurse_id: nurseId,
+    room_id: roomId,
+  };
 };

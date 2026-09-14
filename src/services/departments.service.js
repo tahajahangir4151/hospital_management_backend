@@ -1,4 +1,3 @@
-import pool from "../config/database.js";
 import prisma from "../config/prisma.js";
 
 //Get All Departments

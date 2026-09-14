@@ -1,5 +1,5 @@
 import express from "express";
-import pool from "../config/database.js";
+import prisma from "../config/prisma.js";
 
 const router = express.Router();
 
@@ -49,7 +49,7 @@ router.get("/", (req, res) => {
  */
 router.get("/database", async (req, res) => {
   try {
-    await pool.query("SELECT 1");
+    await prisma.$queryRaw`SELECT 1`;
 
     res.status(200).json({
       success: true,

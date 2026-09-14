@@ -1,84 +1,81 @@
-import pool from "../config/database.js";
+import prisma from "../config/prisma.js";
 
 // Get all nurses
 export const getNurses = async () => {
-  const result = await pool.query(`
-    SELECT *
-    FROM nurses
-    ORDER BY created_at DESC
-  `);
+  const nurses = await prisma.nurses.findMany({
+    orderBy: {
+      created_at: "desc",
+    },
+  });
 
-  return result.rows;
+  return nurses;
 };
 
 // Create nurse
 export const createNurse = async (nurse) => {
-  const result = await pool.query(
-    `
-      INSERT INTO nurses (
-        name,
-        shift_timing,
-        contact_number,
-        department_id
-      )
-      VALUES ($1, $2, $3, $4)
-      RETURNING *
-    `,
-    [nurse.name, nurse.shift_timing, nurse.contact_number, nurse.department_id],
-  );
+  const newNurse = await prisma.nurses.create({
+    data: {
+      name: nurse.name,
+      shift_timing: nurse.shift_timing,
+      contact_number: nurse.contact_number,
+      department_id: nurse.department_id,
+    },
+  });
 
-  return result.rows[0];
+  return newNurse;
 };
 
 // Get nurse by ID
 export const getNurseById = async (id) => {
-  const result = await pool.query(
-    `
-      SELECT *
-      FROM nurses
-      WHERE id = $1
-    `,
-    [id],
-  );
+  const nurse = await prisma.nurses.findUnique({
+    where: {
+      id,
+    },
+  });
 
-  return result.rows[0] || null;
+  return nurse;
 };
 
 // Update nurse
 export const updateNurseById = async (id, nurse) => {
-  const result = await pool.query(
-    `
-      UPDATE nurses
-      SET
-        name = $1,
-        shift_timing = $2,
-        contact_number = $3,
-        department_id = $4
-      WHERE id = $5
-      RETURNING *
-    `,
-    [
-      nurse.name,
-      nurse.shift_timing,
-      nurse.contact_number,
-      nurse.department_id,
-      id,
-    ],
-  );
+  try {
+    const updatedNurse = await prisma.nurses.update({
+      where: {
+        id,
+      },
+      data: {
+        name: nurse.name,
+        shift_timing: nurse.shift_timing,
+        contact_number: nurse.contact_number,
+        department_id: nurse.department_id,
+      },
+    });
 
-  return result.rows[0] || null;
+    return updatedNurse;
+  } catch (error) {
+    if (error.code === "P2025") {
+      return null;
+    }
+
+    throw error;
+  }
 };
 
 // Delete nurse
 export const deleteNurseById = async (id) => {
-  const result = await pool.query(
-    `
-      DELETE FROM nurses
-      WHERE id = $1
-      RETURNING *
-    `,
-    [id],
-  );
+  try {
+    const deletedNurse = await prisma.nurses.delete({
+      where: {
+        id,
+      },
+    });
 
-  return result.rows[0] || null;
+    return deletedNurse;
+  } catch (error) {
+    if (error.code === "P2025") {
+      return null;
+    }
+
+    throw error;
+  }
 };

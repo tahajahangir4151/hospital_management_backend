@@ -1,42 +1,41 @@
-import pool from "../config/database.js";
+import prisma from "../config/prisma.js";
 
 // Get all bills
 export const getAllBills = async () => {
-  const result = await pool.query(`
-    SELECT
-      b.*,
-      json_build_object(
-        'id', p.id,
-        'name', p.name
-      ) AS patients
-    FROM bills b
-    LEFT JOIN patients p
-      ON b.patient_id = p.id
-    ORDER BY b.created_at DESC
-  `);
+  const bills = await prisma.bills.findMany({
+    include: {
+      patients: {
+        select: {
+          id: true,
+          name: true,
+        },
+      },
+    },
+    orderBy: {
+      created_at: "desc",
+    },
+  });
 
-  return result.rows;
+  return bills;
 };
 
 // Get bill by ID
 export const getBillById = async (id) => {
-  const result = await pool.query(
-    `
-      SELECT
-        b.*,
-        json_build_object(
-          'id', p.id,
-          'name', p.name
-        ) AS patients
-      FROM bills b
-      LEFT JOIN patients p
-        ON b.patient_id = p.id
-      WHERE b.id = $1
-    `,
-    [id],
-  );
+  const bill = await prisma.bills.findUnique({
+    where: {
+      id,
+    },
+    include: {
+      patients: {
+        select: {
+          id: true,
+          name: true,
+        },
+      },
+    },
+  });
 
-  return result.rows[0] || null;
+  return bill;
 };
 
 // Create bill
@@ -55,16 +54,16 @@ export const createBill = async ({
   }
 
   // Check patient exists
-  const patientResult = await pool.query(
-    `
-      SELECT id
-      FROM patients
-      WHERE id = $1
-    `,
-    [patient_id],
-  );
+  const patient = await prisma.patients.findUnique({
+    where: {
+      id: patient_id,
+    },
+    select: {
+      id: true,
+    },
+  });
 
-  if (patientResult.rows.length === 0) {
+  if (!patient) {
     const error = new Error("Patient not found");
     error.statusCode = 404;
     throw error;
@@ -72,40 +71,20 @@ export const createBill = async ({
 
   const billNumber = `BILL-${Date.now()}`;
 
-  let result;
+  const bill = await prisma.bills.create({
+    data: {
+      bill_number: billNumber,
+      patient_id,
+      total_amount,
+      payment_status,
 
-  if (date_issued) {
-    result = await pool.query(
-      `
-        INSERT INTO bills (
-          bill_number,
-          patient_id,
-          total_amount,
-          payment_status,
-          date_issued
-        )
-        VALUES ($1, $2, $3, $4, $5)
-        RETURNING *
-      `,
-      [billNumber, patient_id, total_amount, payment_status, date_issued],
-    );
-  } else {
-    result = await pool.query(
-      `
-        INSERT INTO bills (
-          bill_number,
-          patient_id,
-          total_amount,
-          payment_status
-        )
-        VALUES ($1, $2, $3, $4)
-        RETURNING *
-      `,
-      [billNumber, patient_id, total_amount, payment_status],
-    );
-  }
+      ...(date_issued && {
+        date_issued: new Date(date_issued),
+      }),
+    },
+  });
 
-  return result.rows[0];
+  return bill;
 };
 
 // Update bill
@@ -113,86 +92,89 @@ export const updateBillById = async (
   id,
   { total_amount, payment_status, date_issued },
 ) => {
-  const fields = [];
-  const values = [];
+  const data = {};
 
   if (total_amount !== undefined) {
-    values.push(total_amount);
-    fields.push(`total_amount = $${values.length}`);
+    data.total_amount = total_amount;
   }
 
   if (payment_status !== undefined) {
-    values.push(payment_status);
-    fields.push(`payment_status = $${values.length}`);
+    data.payment_status = payment_status;
   }
 
   if (date_issued !== undefined) {
-    values.push(date_issued);
-    fields.push(`date_issued = $${values.length}`);
+    data.date_issued = new Date(date_issued);
   }
 
-  if (fields.length === 0) {
+  if (Object.keys(data).length === 0) {
     const error = new Error("No fields provided to update");
     error.statusCode = 400;
     throw error;
   }
 
-  values.push(id);
+  try {
+    const bill = await prisma.bills.update({
+      where: {
+        id,
+      },
+      data,
+    });
 
-  const result = await pool.query(
-    `
-      UPDATE bills
-      SET ${fields.join(", ")}
-      WHERE id = $${values.length}
-      RETURNING *
-    `,
-    values,
-  );
+    return bill;
+  } catch (error) {
+    if (error.code === "P2025") {
+      return null;
+    }
 
-  return result.rows[0] || null;
+    throw error;
+  }
 };
 
 // Delete bill
 export const deleteBillById = async (id) => {
-  const result = await pool.query(
-    `
-      DELETE FROM bills
-      WHERE id = $1
-      RETURNING *
-    `,
-    [id],
-  );
+  try {
+    const bill = await prisma.bills.delete({
+      where: {
+        id,
+      },
+    });
 
-  return result.rows[0] || null;
+    return bill;
+  } catch (error) {
+    if (error.code === "P2025") {
+      return null;
+    }
+
+    throw error;
+  }
 };
 
 // Get bills by patient ID
 export const getBillsByPatientId = async (patientId) => {
   // Check patient exists
-  const patientResult = await pool.query(
-    `
-      SELECT id
-      FROM patients
-      WHERE id = $1
-    `,
-    [patientId],
-  );
+  const patient = await prisma.patients.findUnique({
+    where: {
+      id: patientId,
+    },
+    select: {
+      id: true,
+    },
+  });
 
-  if (patientResult.rows.length === 0) {
+  if (!patient) {
     const error = new Error("Patient not found");
     error.statusCode = 404;
     throw error;
   }
 
-  const result = await pool.query(
-    `
-      SELECT *
-      FROM bills
-      WHERE patient_id = $1
-      ORDER BY date_issued DESC
-    `,
-    [patientId],
-  );
+  const bills = await prisma.bills.findMany({
+    where: {
+      patient_id: patientId,
+    },
+    orderBy: {
+      date_issued: "desc",
+    },
+  });
 
-  return result.rows;
+  return bills;
 };

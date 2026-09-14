@@ -1,93 +1,83 @@
-import pool from "../config/database.js";
+import prisma from "../config/prisma.js";
 
 // Get all patients
 export const getPatients = async () => {
-  const result = await pool.query(`
-    SELECT *
-    FROM patients
-    ORDER BY created_at DESC
-  `);
+  const patients = await prisma.patients.findMany({
+    orderBy: {
+      created_at: "desc",
+    },
+  });
 
-  return result.rows;
+  return patients;
 };
 
 // Get patient by ID
 export const getPatientById = async (id) => {
-  const result = await pool.query(
-    `
-      SELECT *
-      FROM patients
-      WHERE id = $1
-    `,
-    [id],
-  );
+  const patient = await prisma.patients.findUnique({
+    where: {
+      id,
+    },
+  });
 
-  return result.rows[0] || null;
+  return patient;
 };
 
 // Create patient
 export const createPatient = async (patient) => {
-  const result = await pool.query(
-    `
-      INSERT INTO patients (
-        name,
-        date_of_birth,
-        gender,
-        address,
-        phone_number
-      )
-      VALUES ($1, $2, $3, $4, $5)
-      RETURNING *
-    `,
-    [
-      patient.name,
-      patient.date_of_birth,
-      patient.gender,
-      patient.address,
-      patient.phone_number,
-    ],
-  );
+  const newPatient = await prisma.patients.create({
+    data: {
+      name: patient.name,
+      date_of_birth: new Date(patient.date_of_birth),
+      gender: patient.gender,
+      address: patient.address,
+      phone_number: patient.phone_number,
+    },
+  });
 
-  return result.rows[0];
+  return newPatient;
 };
 
 // Update patient
 export const updatePatientById = async (id, patient) => {
-  const result = await pool.query(
-    `
-      UPDATE patients
-      SET
-        name = $1,
-        date_of_birth = $2,
-        gender = $3,
-        address = $4,
-        phone_number = $5
-      WHERE id = $6
-      RETURNING *
-    `,
-    [
-      patient.name,
-      patient.date_of_birth,
-      patient.gender,
-      patient.address,
-      patient.phone_number,
-      id,
-    ],
-  );
+  try {
+    const updatedPatient = await prisma.patients.update({
+      where: {
+        id,
+      },
+      data: {
+        name: patient.name,
+        date_of_birth: new Date(patient.date_of_birth),
+        gender: patient.gender,
+        address: patient.address,
+        phone_number: patient.phone_number,
+      },
+    });
 
-  return result.rows[0] || null;
+    return updatedPatient;
+  } catch (error) {
+    if (error.code === "P2025") {
+      return null;
+    }
+
+    throw error;
+  }
 };
 
 // Delete patient
 export const deletePatientById = async (id) => {
-  const result = await pool.query(
-    `
-      DELETE FROM patients
-      WHERE id = $1
-      RETURNING *
-    `,
-    [id],
-  );
+  try {
+    const deletedPatient = await prisma.patients.delete({
+      where: {
+        id,
+      },
+    });
 
-  return result.rows[0] || null;
+    return deletedPatient;
+  } catch (error) {
+    if (error.code === "P2025") {
+      return null;
+    }
+
+    throw error;
+  }
 };

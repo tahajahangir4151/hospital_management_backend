@@ -1,5 +1,5 @@
 import jwt from "jsonwebtoken";
-import pool from "../config/database.js";
+import prisma from "../config/prisma.js";
 
 export const authenticateAdmin = async (req, res, next) => {
   try {
@@ -25,21 +25,18 @@ export const authenticateAdmin = async (req, res, next) => {
       });
     }
 
-    // Get user from local PostgreSQL
-    const result = await pool.query(
-      `
-        SELECT
-          id,
-          full_name,
-          email,
-          role
-        FROM users
-        WHERE id = $1
-      `,
-      [decoded.id],
-    );
-
-    const user = result.rows[0];
+    // Get user with Prisma
+    const user = await prisma.users.findUnique({
+      where: {
+        id: decoded.id,
+      },
+      select: {
+        id: true,
+        full_name: true,
+        email: true,
+        role: true,
+      },
+    });
 
     if (!user) {
       return res.status(401).json({

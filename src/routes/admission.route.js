@@ -5,11 +5,8 @@ import {
   dischargeAdmission,
   getAllAdmissions,
 } from "../controllers/admission.controller.js";
-import { createRequire } from "module";
 
 var module = { exports: {} };
-
-const require = createRequire(import.meta.url);
 
 const router = express.Router();
 

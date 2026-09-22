@@ -1,0 +1,19 @@
+FROM node:24-bookworm-slim
+
+WORKDIR /app
+
+COPY package.json package-lock.json ./
+
+RUN npm ci
+
+COPY prisma ./prisma
+COPY prisma7.config.ts ./
+
+RUN DATABASE_URL="postgresql://postgres:dummy@localhost:5432/hospital-management?schema=public" npx prisma generate
+
+COPY src ./src
+COPY server.js ./
+
+EXPOSE 5000
+
+CMD ["npm", "start"]
